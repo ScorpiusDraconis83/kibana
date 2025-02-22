@@ -1,9 +1,10 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License
- * 2.0 and the Server Side Public License, v 1; you may not use this file except
- * in compliance with, at your election, the Elastic License 2.0 or the Server
- * Side Public License, v 1.
+ * or more contributor license agreements. Licensed under the "Elastic License
+ * 2.0", the "GNU Affero General Public License v3.0 only", and the "Server Side
+ * Public License v 1"; you may not use this file except in compliance with, at
+ * your election, the "Elastic License 2.0", the "GNU Affero General Public
+ * License v3.0 only", or the "Server Side Public License, v 1".
  */
 
 import Path from 'path';
@@ -121,11 +122,6 @@ export class ImportResolver {
       return true;
     }
 
-    // ignore amd require done by ace syntax plugin
-    if (req === 'ace/lib/dom') {
-      return true;
-    }
-
     // typescript validates these imports fine and they're purely virtual thanks to ambient type definitions in @elastic/eui so /shrug
     if (
       req.startsWith('@elastic/eui/src/components/') ||
@@ -235,8 +231,8 @@ export class ImportResolver {
   resolve(req: string, dirname: string): ResolveResult | null {
     // transform webpack loader requests and focus on the actual file selected
     const lastExI = req.lastIndexOf('!');
-    if (lastExI > -1) {
-      const quesI = req.lastIndexOf('?');
+    const quesI = req.lastIndexOf('?');
+    if (lastExI > -1 || quesI > -1) {
       const prefix = req.slice(0, lastExI + 1);
       const postfix = quesI > -1 ? req.slice(quesI) : '';
       const result = this.resolve(req.slice(lastExI + 1, quesI > -1 ? quesI : undefined), dirname);

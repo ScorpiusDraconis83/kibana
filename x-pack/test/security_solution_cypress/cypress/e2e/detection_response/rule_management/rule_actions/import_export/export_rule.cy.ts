@@ -52,7 +52,7 @@ const prebuiltRules = Array.from(Array(7)).map((_, i) => {
   });
 });
 
-describe('Export rules', { tags: ['@ess', '@serverless'] }, () => {
+describe('Export rules', { tags: ['@ess', '@serverless', '@skipInServerlessMKI'] }, () => {
   const downloadsFolder = Cypress.config('downloadsFolder');
 
   beforeEach(() => {
@@ -96,7 +96,7 @@ describe('Export rules', { tags: ['@ess', '@serverless'] }, () => {
   // https://github.com/elastic/kibana/issues/179959
   it(
     'shows a modal saying that no rules can be exported if all the selected rules are prebuilt',
-    { tags: ['@brokenInServerlessQA'] },
+    { tags: ['@skipInServerlessMKI'] },
     function () {
       createAndInstallMockedPrebuiltRules(prebuiltRules);
 
@@ -111,7 +111,7 @@ describe('Export rules', { tags: ['@ess', '@serverless'] }, () => {
   );
 
   // https://github.com/elastic/kibana/issues/179960
-  it('exports only custom rules', { tags: ['@brokenInServerlessQA'] }, function () {
+  it('exports only custom rules', { tags: ['@skipInServerless'] }, function () {
     const expectedNumberCustomRulesToBeExported = 1;
 
     createAndInstallMockedPrebuiltRules(prebuiltRules);
@@ -127,7 +127,7 @@ describe('Export rules', { tags: ['@ess', '@serverless'] }, () => {
 
     // proceed with exporting only custom rules
     cy.get(MODAL_CONFIRMATION_BTN)
-      .should('have.text', `Export ${expectedNumberCustomRulesToBeExported} custom rule`)
+      .should('have.text', `Export ${expectedNumberCustomRulesToBeExported} rule`)
       .click();
 
     getAvailablePrebuiltRulesCount().then((availablePrebuiltRulesCount) => {
@@ -164,7 +164,7 @@ describe('Export rules', { tags: ['@ess', '@serverless'] }, () => {
     });
 
     // https://github.com/elastic/kibana/issues/180029
-    it('exports custom rules with exceptions', { tags: ['@brokenInServerlessQA'] }, function () {
+    it('exports custom rules with exceptions', { tags: ['@skipInServerlessMKI'] }, function () {
       // one rule with exception, one without it
       const expectedNumberCustomRulesToBeExported = 2;
 
@@ -175,7 +175,7 @@ describe('Export rules', { tags: ['@ess', '@serverless'] }, () => {
 
       // should display correct number of custom rules when one of them has exceptions
       cy.get(MODAL_CONFIRMATION_BTN)
-        .should('have.text', `Export ${expectedNumberCustomRulesToBeExported} custom rules`)
+        .should('have.text', `Export ${expectedNumberCustomRulesToBeExported} rules`)
         .click();
 
       cy.get(TOASTER_BODY).should(

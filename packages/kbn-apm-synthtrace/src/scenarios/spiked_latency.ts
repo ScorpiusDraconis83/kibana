@@ -1,9 +1,10 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License
- * 2.0 and the Server Side Public License, v 1; you may not use this file except
- * in compliance with, at your election, the Elastic License 2.0 or the Server
- * Side Public License, v 1.
+ * or more contributor license agreements. Licensed under the "Elastic License
+ * 2.0", the "GNU Affero General Public License v3.0 only", and the "Server Side
+ * Public License v 1"; you may not use this file except in compliance with, at
+ * your election, the "Elastic License 2.0", the "GNU Affero General Public
+ * License v3.0 only", or the "Server Side Public License, v 1".
  */
 
 import { random } from 'lodash';
@@ -14,17 +15,25 @@ import {
   generateLongId,
   generateShortId,
   Instance,
+  LogDocument,
 } from '@kbn/apm-synthtrace-client';
 import { Scenario } from '../cli/scenario';
 import { getSynthtraceEnvironment } from '../lib/utils/get_synthtrace_environment';
 import { withClient } from '../lib/utils/with_client';
+import { parseLogsScenarioOpts } from './helpers/logs_scenario_opts_parser';
+import { IndexTemplateName } from '../lib/logs/custom_logsdb_index_templates';
 
 const ENVIRONMENT = getSynthtraceEnvironment(__filename);
 const alwaysSpikeTransactionName = 'GET /always-spike';
 const sometimesSpikeTransactionName = 'GET /sometimes-spike';
 
-const scenario: Scenario<ApmFields> = async ({ logger }) => {
+const scenario: Scenario<LogDocument | ApmFields> = async ({ logger, ...runOptions }) => {
+  const { isLogsDb } = parseLogsScenarioOpts(runOptions.scenarioOpts);
+
   return {
+    bootstrap: async ({ logsEsClient }) => {
+      if (isLogsDb) await logsEsClient.createIndexTemplate(IndexTemplateName.LogsDb);
+    },
     generate: ({ range, clients: { apmEsClient, logsEsClient } }) => {
       const serviceNames = ['spikey-frontend', 'spikey-backend'];
 
@@ -40,10 +49,9 @@ const scenario: Scenario<ApmFields> = async ({ logger }) => {
         instanceId: generateShortId(),
         cloudProvider: cluster.provider,
         cloudRegion: cluster.region,
+        containerId: `spiked-container-${generateShortId()}`,
+        hostName: `spiked-host-${generateShortId()}`,
       }));
-
-      const containerId = `spiked-${generateShortId()}`;
-      const hostName = `spiked-${generateShortId()}`;
 
       function buildLogs(serviceName: string) {
         return range
@@ -59,10 +67,12 @@ const scenario: Scenario<ApmFields> = async ({ logger }) => {
               instanceId,
               cloudRegion,
               cloudProvider,
+              containerId,
+              hostName,
             } = clusters[clusterIndex];
 
             return log
-              .create()
+              .create({ isLogsDb })
               .message(`Error message #${generateShortId()} from ${serviceName}`)
               .logLevel('error')
               .service(serviceName)
@@ -101,6 +111,9 @@ const scenario: Scenario<ApmFields> = async ({ logger }) => {
       const buildTransactions = (serviceInstance: Instance, transactionName: string) => {
         const interval = random(1, 100, false);
         const rangeWithInterval = range.interval(`${interval}s`);
+
+        const clusterIndex = Math.floor(Math.random() * clusters.length);
+        const { containerId, hostName } = clusters[clusterIndex];
 
         return rangeWithInterval.generator((timestamp, i) => {
           const duration = getDuration(transactionName);

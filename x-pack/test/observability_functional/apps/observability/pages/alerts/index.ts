@@ -75,6 +75,7 @@ export default ({ getService }: FtrProviderContext) => {
 
         it('Autocompletion works', async () => {
           await observability.alerts.common.typeInQueryBar('kibana.alert.s');
+          await observability.alerts.common.clickOnQueryBar();
           await testSubjects.existOrFail('autocompleteSuggestion-field-kibana.alert.start-');
           await testSubjects.existOrFail('autocompleteSuggestion-field-kibana.alert.status-');
         });
@@ -127,7 +128,7 @@ export default ({ getService }: FtrProviderContext) => {
           await testSubjects.missingOrFail('alertsFlyout');
         });
 
-        describe('When open', async () => {
+        describe('When open', () => {
           before(async () => {
             await observability.alerts.common.openAlertsFlyout(20);
           });
@@ -227,6 +228,7 @@ export default ({ getService }: FtrProviderContext) => {
           const actionsButton = await observability.alerts.common.getActionsButtonByIndex(0);
           await actionsButton.click();
           await observability.alerts.common.viewRuleDetailsButtonClick();
+
           expect(
             await (await find.byCssSelector('[data-test-subj="breadcrumb first"]')).getVisibleText()
           ).to.eql('Observability');
