@@ -22,6 +22,7 @@ This library can currently be used in two ways:
 - `Timerange`: an object that will return an array of timestamps based on an interval and a rate. These timestamps can be used to generate events/metricsets.
 - `Transaction`, `Span`, `APMError` and `Metricset`: events/metricsets that occur on an instance. For more background, see the [explanation of the APM data model](https://www.elastic.co/guide/en/apm/get-started/7.15/apm-data-model.html)
 - `Log`: An instance of Log generating Service which supports additional helpers to customise fields like `messages`, `logLevel`
+- `SyntheticsMonitor`: An instance of Synthetic monitor. For more information see [Synthetic monitoring](https://www.elastic.co/guide/en/observability/current/monitor-uptime-synthetics.html).
 
 #### Example
 
@@ -98,17 +99,46 @@ Via the CLI, you can run scenarios, either using a fixed time range or continuou
 
 For live data ingestion:
 
-```
+```sh
 node scripts/synthtrace simple_trace.ts --target=http://admin:changeme@localhost:9200 --live
 ```
 
 For a fixed time window:
 
-```
+```sh
 node scripts/synthtrace simple_trace.ts --target=http://admin:changeme@localhost:9200 --from=now-24h --to=now
 ```
 
 The script will try to automatically find bootstrapped APM indices. **If these indices do not exist, the script will exit with an error. It will not bootstrap the indices itself.**
+
+#### Local Development
+
+When running the CLI locally, you can simply use the following command to ingest data to a locally running Elasticsearch and Kibana instance:
+
+```sh
+node scripts/synthtrace simple_trace.ts
+```
+_Assuming both Elasticsearch and Kibana are running on the default localhost ports with default credentials._
+
+#### A note when Kibana URL differs from Elasticsearch URL
+
+If the Kibana URL differs from the Elasticsearch URL in protocol or hostname, you should explicitly pass the `--kibana` option to the CLI along with `--target`.
+
+For example when running ES (with ssl) and Kibana (without ssl) locally in Serverless mode, it's recommended to provide both `--target` and `--kibana` options as the auto-discovered Kibana URL might not be correct in this case.
+Also use `localhost` instead of `127.0.0.1` as the hostname as `127.0.0.1` will likely not work with self-signed certificates.  
+
+```sh
+node scripts/synthtrace simple_trace.ts --target=https://elastic_serverless:changeme@localhost:9200 --kibana=http://elastic_serverless:changeme@localhost:5601
+```
+
+#### Using CLI for Elastic Cloud URLs
+
+If you are ingesting data to Elastic Cloud, you can pass the `--target` option with the Elastic Cloud URL. The CLI will infer the Kibana URL from the Elasticsearch URL. 
+Or you can pass only `--kibana` and the CLI will infer the Elasticsearch URL from the Kibana URL. Or pass both if URLs are not in default scheme.
+
+```sh
+node scripts/synthtrace simple_trace.ts --target=https://<username>:<password>@your-cloud-cluster.kb.us-west2.gcp.elastic-cloud.com/
+```
 
 ### Understanding Scenario Files
 
@@ -118,7 +148,7 @@ Scenario files accept 3 arguments, 2 of them optional and 1 mandatory
 |-------------|:----------|------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `generate`  | mandatory | This is the main function responsible for returning the events which will be indexed                                                                 |
 | `bootstrap`  | optional  | In case some setup needs to be done, before the data is generated, this function provides access to all available ES Clients to play with            |
-| `setClient` | optional  | By default the apmEsClient used to generate data. If anyother client like logsEsClient needs to be used instead, this is where it should be returned |
+| `teardown` | optional  | In case some setup needs to be done, after all data is generated, this function provides access to all available ES Clients to play with |
 
 The following options are supported:
 

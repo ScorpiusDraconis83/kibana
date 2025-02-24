@@ -1,9 +1,10 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License
- * 2.0 and the Server Side Public License, v 1; you may not use this file except
- * in compliance with, at your election, the Elastic License 2.0 or the Server
- * Side Public License, v 1.
+ * or more contributor license agreements. Licensed under the "Elastic License
+ * 2.0", the "GNU Affero General Public License v3.0 only", and the "Server Side
+ * Public License v 1"; you may not use this file except in compliance with, at
+ * your election, the "Elastic License 2.0", the "GNU Affero General Public
+ * License v3.0 only", or the "Server Side Public License, v 1".
  */
 
 import Url from 'url';
@@ -11,6 +12,7 @@ import { inspect, format } from 'util';
 import { setTimeout as setTimer } from 'timers/promises';
 import * as Rx from 'rxjs';
 import apmNode from 'elastic-apm-node';
+import type { ApmBase } from '@elastic/apm-rum';
 import playwright, { ChromiumBrowser, Page, BrowserContext, CDPSession, Request } from 'playwright';
 import { asyncMap, asyncForEach } from '@kbn/std';
 import { ToolingLog } from '@kbn/tooling-log';
@@ -30,6 +32,13 @@ import type { JourneyConfig } from './journey_config';
 import { JourneyScreenshots } from './journey_screenshots';
 import { getNewPageObject } from '../services/page';
 import { getSynthtraceClient } from '../services/synthtrace';
+
+type WindowWithApmContext = Window & {
+  elasticApm?: ApmBase;
+  traceIdOverrideListenerAttached?: boolean;
+  journeyTraceId?: string;
+  journeyParentId?: string;
+};
 
 export class JourneyFtrHarness {
   private readonly screenshots: JourneyScreenshots;
@@ -151,7 +160,7 @@ export class JourneyFtrHarness {
   private async setupBrowserAndPage() {
     const browser = await this.getBrowserInstance();
     const browserContextArgs = this.auth.isCloud() ? {} : { bypassCSP: true };
-    this.context = await browser.newContext(browserContextArgs);
+    this.context = await browser.newContext({ ...browserContextArgs, ignoreHTTPSErrors: true });
 
     if (this.journeyConfig.shouldAutoLogin()) {
       const cookie = await this.auth.login();
@@ -160,6 +169,53 @@ export class JourneyFtrHarness {
 
     this.page = await this.context.newPage();
 
+    await this.interceptBrowserRequests(this.page);
+
+    const initializeApmInitListener = async () => {
+      await this.page?.evaluate(() => {
+        const win = window as WindowWithApmContext;
+
+        const attachTraceIdOverrideListener = () => {
+          if (win.traceIdOverrideListenerAttached) {
+            return;
+          }
+          win.traceIdOverrideListenerAttached = true;
+          win.elasticApm!.observe('transaction:start', (tx) => {
+            // private properties, bit of a hack
+            // @ts-expect-error
+            tx.traceId = win.journeyTraceId || tx.traceId;
+            // @ts-expect-error
+            tx.parentId = win.journeyParentId || tx.parentId;
+          });
+        };
+
+        if (win.elasticApm) {
+          attachTraceIdOverrideListener();
+        } else {
+          // attach trace listener as soon as elasticApm API is available
+          let originalValue: any;
+
+          Object.defineProperty(window, 'elasticApm', {
+            get() {
+              return originalValue;
+            },
+            set(newValue) {
+              originalValue = newValue;
+              attachTraceIdOverrideListener();
+            },
+            configurable: true,
+            enumerable: true,
+          });
+        }
+      });
+    };
+
+    this.page.on('framenavigated', () => {
+      initializeApmInitListener();
+    });
+
+    await initializeApmInitListener();
+
     if (!process.env.NO_BROWSER_LOG) {
       this.page.on('console', this.onConsoleEvent);
     }
@@ -167,7 +223,6 @@ export class JourneyFtrHarness {
     await this.sendCDPCommands(this.context, this.page);
 
     this.trackTelemetryRequests(this.page);
-    await this.interceptBrowserRequests(this.page);
   }
 
   private async runSynthtrace() {
@@ -305,17 +360,37 @@ export class JourneyFtrHarness {
     ]);
   }
 
+  private async takeScreenshots(page: Page) {
+    let screenshot;
+    let fs;
+    // screenshots taking might crash the browser
+    try {
+      screenshot = await page.screenshot({ animations: 'disabled' });
+      fs = await page.screenshot({ animations: 'disabled', fullPage: true });
+    } catch (e) {
+      if (!screenshot) {
+        this.log.error(`Failed to take screenshot of the visible viewport: ${e.message}`);
+      } else if (screenshot && !fs) {
+        this.log.error(`Failed to take screenshot of the full scrollable page: ${e.message}`);
+      } else {
+        this.log.error(`Unknown error on taking screenshots`);
+      }
+    }
+
+    return { screenshot, fs };
+  }
+
   private async onStepSuccess(step: AnyStep) {
     if (!this.page) {
       return;
     }
 
-    const [screenshot, fs] = await Promise.all([
-      this.page.screenshot(),
-      this.page.screenshot({ fullPage: true }),
-    ]);
-
-    await this.screenshots.addSuccess(step, screenshot, fs);
+    if (this.journeyConfig.takeScreenshotOnSuccess()) {
+      const { screenshot, fs } = await this.takeScreenshots(this.page);
+      if (screenshot && fs) {
+        await this.screenshots.addSuccess(step, screenshot, fs);
+      }
+    }
   }
 
   private async onStepError(step: AnyStep, err: Error) {
@@ -325,12 +400,10 @@ export class JourneyFtrHarness {
     }
 
     if (this.page) {
-      const [screenshot, fs] = await Promise.all([
-        this.page.screenshot(),
-        this.page.screenshot({ fullPage: true }),
-      ]);
-
-      await this.screenshots.addError(step, screenshot, fs);
+      const { screenshot, fs } = await this.takeScreenshots(this.page);
+      if (screenshot && fs) {
+        await this.screenshots.addError(step, screenshot, fs);
+      }
     }
   }
 
@@ -363,9 +436,12 @@ export class JourneyFtrHarness {
     }
   }
 
+  private getCurrentSpanOrTransaction() {
+    return this.currentSpanStack.length ? this.currentSpanStack[0] : this.currentTransaction;
+  }
+
   private getCurrentTraceparent() {
-    return (this.currentSpanStack.length ? this.currentSpanStack[0] : this.currentTransaction)
-      ?.traceparent;
+    return this.getCurrentSpanOrTransaction()?.traceparent;
   }
 
   private async getBrowserInstance() {
@@ -495,6 +571,18 @@ export class JourneyFtrHarness {
       for (const step of steps) {
         it(step.name, async () => {
           await this.withSpan(`step: ${step.name}`, 'step', async () => {
+            await this.page?.evaluate(
+              ([traceId, parentId]) => {
+                const win = window as WindowWithApmContext;
+                win.journeyTraceId = traceId;
+                win.journeyParentId = parentId;
+              },
+              [
+                this.apm?.currentTraceIds['trace.id'],
+                this.apm?.currentTraceIds['span.id'] || this.apm?.currentTraceIds['transaction.id'],
+              ]
+            );
+
             try {
               await step.fn(this.getCtx());
               await this.onStepSuccess(step);

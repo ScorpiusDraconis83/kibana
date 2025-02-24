@@ -1,21 +1,19 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License
- * 2.0 and the Server Side Public License, v 1; you may not use this file except
- * in compliance with, at your election, the Elastic License 2.0 or the Server
- * Side Public License, v 1.
+ * or more contributor license agreements. Licensed under the "Elastic License
+ * 2.0", the "GNU Affero General Public License v3.0 only", and the "Server Side
+ * Public License v 1"; you may not use this file except in compliance with, at
+ * your election, the "Elastic License 2.0", the "GNU Affero General Public
+ * License v3.0 only", or the "Server Side Public License, v 1".
  */
 
 const Path = require('path');
 const Crypto = require('crypto');
-const startOfDay = /** @type {import('date-fns/startOfDay').default} */ (
-  /** @type {unknown} */ (require('date-fns/startOfDay'))
-);
 
 const chalk = require('chalk');
 const LmdbStore = require('lmdb');
 
-const GLOBAL_ATIME = startOfDay(new Date()).valueOf();
+const GLOBAL_ATIME = new Date().setHours(0, 0, 0, 0);
 const MINUTE = 1000 * 60;
 const HOUR = MINUTE * 60;
 const DAY = HOUR * 24;
