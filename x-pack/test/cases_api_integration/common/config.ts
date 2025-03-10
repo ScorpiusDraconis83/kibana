@@ -9,6 +9,7 @@ import path from 'path';
 
 import { CA_CERT_PATH } from '@kbn/dev-utils';
 import { FtrConfigProviderContext, findTestPluginPaths } from '@kbn/test';
+import { ScoutTestRunConfigCategory } from '@kbn/scout-info';
 
 import { getAllExternalServiceSimulatorPaths } from '@kbn/actions-simulators-plugin/server/plugin';
 import { services } from './services';
@@ -22,6 +23,7 @@ interface CreateTestConfigOptions {
 }
 
 const enabledActionTypes = [
+  '.cases',
   '.cases-webhook',
   '.email',
   '.index',
@@ -59,6 +61,7 @@ export function createTestConfig(name: string, options: CreateTestConfigOptions)
     };
 
     return {
+      testConfigCategory: ScoutTestRunConfigCategory.API_TEST,
       testFiles,
       servers,
       services,

@@ -1,9 +1,10 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License
- * 2.0 and the Server Side Public License, v 1; you may not use this file except
- * in compliance with, at your election, the Elastic License 2.0 or the Server
- * Side Public License, v 1.
+ * or more contributor license agreements. Licensed under the "Elastic License
+ * 2.0", the "GNU Affero General Public License v3.0 only", and the "Server Side
+ * Public License v 1"; you may not use this file except in compliance with, at
+ * your election, the "Elastic License 2.0", the "GNU Affero General Public
+ * License v3.0 only", or the "Server Side Public License, v 1".
  */
 
 import { ToolingLog } from '@kbn/tooling-log';
@@ -30,13 +31,14 @@ export interface BuildOptions {
   createRpmPackage: boolean;
   createDebPackage: boolean;
   createDockerUBI: boolean;
-  createDockerUbuntu: boolean;
+  createDockerWolfi: boolean;
   createDockerCloud: boolean;
   createDockerServerless: boolean;
   createDockerContexts: boolean;
   createDockerFIPS: boolean;
   versionQualifier: string | undefined;
   targetAllPlatforms: boolean;
+  targetServerlessPlatforms: boolean;
   withExamplePlugins: boolean;
   withTestPlugins: boolean;
   eprRegistry: 'production' | 'snapshot';
@@ -74,7 +76,6 @@ export async function buildDistributables(log: ToolingLog, options: BuildOptions
     }
 
     await run(Tasks.CopyLegacySource);
-    await run(Tasks.CopyBinScripts);
 
     await run(Tasks.CreateEmptyDirsAndFiles);
     await run(Tasks.CreateReadme);
@@ -106,9 +107,8 @@ export async function buildDistributables(log: ToolingLog, options: BuildOptions
    */
   if (options.createPlatformFolders) {
     await run(Tasks.CreateArchivesSources);
-    await run(Tasks.PatchNativeModules);
     await run(Tasks.InstallChromium);
-    await run(Tasks.CleanExtraBinScripts);
+    await run(Tasks.CopyBinScripts);
     await run(Tasks.CleanNodeBuilds);
 
     await run(Tasks.AssertFileTime);
@@ -145,11 +145,10 @@ export async function buildDistributables(log: ToolingLog, options: BuildOptions
     await run(Tasks.CreateDockerUBI);
   }
 
-  if (options.createDockerUbuntu) {
-    // control w/ --docker-images or --skip-docker-ubuntu or --skip-os-packages
-    await run(Tasks.CreateDockerUbuntu);
+  if (options.createDockerWolfi) {
+    // control w/ --docker-images or --skip-docker-wolfi or --skip-os-packages
+    await run(Tasks.CreateDockerWolfi);
   }
-
   if (options.createDockerCloud) {
     // control w/ --docker-images and --skip-docker-cloud
     if (options.downloadCloudDependencies) {
