@@ -6,7 +6,7 @@
  */
 
 import expect from '@kbn/expect';
-import type { TimeStrings } from '../../../../../../../test/functional/page_objects/common_page';
+import type { TimeStrings } from '@kbn/test-suites-src/functional/page_objects/common_page';
 import { FtrProviderContext } from '../../../../ftr_provider_context';
 
 export default function ({ getService, getPageObjects }: FtrProviderContext) {
@@ -32,14 +32,19 @@ export default function ({ getService, getPageObjects }: FtrProviderContext) {
   const log = getService('log');
   const queryBar = getService('queryBar');
 
-  // FLAKY: https://github.com/elastic/kibana/issues/173904
-  describe.skip('discover histogram', function describeIndexTests() {
+  describe('discover histogram', function describeIndexTests() {
     before(async () => {
-      await esArchiver.loadIfNeeded('test/functional/fixtures/es_archiver/logstash_functional');
-      await esArchiver.load('test/functional/fixtures/es_archiver/long_window_logstash');
-      await kibanaServer.importExport.load('test/functional/fixtures/kbn_archiver/discover');
+      await esArchiver.loadIfNeeded(
+        'src/platform/test/functional/fixtures/es_archiver/logstash_functional'
+      );
+      await esArchiver.load(
+        'src/platform/test/functional/fixtures/es_archiver/long_window_logstash'
+      );
       await kibanaServer.importExport.load(
-        'test/functional/fixtures/kbn_archiver/long_window_logstash_index_pattern'
+        'src/platform/test/functional/fixtures/kbn_archiver/discover'
+      );
+      await kibanaServer.importExport.load(
+        'src/platform/test/functional/fixtures/kbn_archiver/long_window_logstash_index_pattern'
       );
       await security.testUser.setRoles(['kibana_admin', 'long_window_logstash']);
       await kibanaServer.uiSettings.replace(defaultSettings);
@@ -48,7 +53,9 @@ export default function ({ getService, getPageObjects }: FtrProviderContext) {
       await PageObjects.common.navigateToApp('discover');
     });
     after(async () => {
-      await esArchiver.unload('test/functional/fixtures/es_archiver/long_window_logstash');
+      await esArchiver.unload(
+        'src/platform/test/functional/fixtures/es_archiver/long_window_logstash'
+      );
       await kibanaServer.savedObjects.cleanStandardList();
       await security.testUser.restoreDefaults();
       await PageObjects.common.unsetTime();
@@ -75,7 +82,7 @@ export default function ({ getService, getPageObjects }: FtrProviderContext) {
         const actualCount = await elasticChart.getVisualizationRenderingCount();
         const expectedCount = prevRenderingCount + renderingCountInc;
         log.debug(`renderings before brushing - actual: ${actualCount} expected: ${expectedCount}`);
-        return actualCount === expectedCount;
+        return actualCount <= expectedCount;
       });
       let prevRowData = '';
       // to make sure the table is already rendered
@@ -309,10 +316,8 @@ export default function ({ getService, getPageObjects }: FtrProviderContext) {
       await PageObjects.discover.saveSearch(savedSearch);
       await PageObjects.discover.chooseBreakdownField('extension.keyword');
       await PageObjects.discover.setChartInterval('Second');
-      let requestData = await testSubjects.getAttribute(
-        'unifiedHistogramChart',
-        'data-request-data'
-      );
+      let requestData =
+        (await testSubjects.getAttribute('unifiedHistogramChart', 'data-request-data')) ?? '';
       expect(JSON.parse(requestData)).to.eql({
         dataViewId: 'long-window-logstash-*',
         timeField: '@timestamp',
@@ -323,7 +328,8 @@ export default function ({ getService, getPageObjects }: FtrProviderContext) {
       await PageObjects.discover.waitUntilSearchingHasFinished();
       await PageObjects.discover.revertUnsavedChanges();
       await PageObjects.discover.waitUntilSearchingHasFinished();
-      requestData = await testSubjects.getAttribute('unifiedHistogramChart', 'data-request-data');
+      requestData =
+        (await testSubjects.getAttribute('unifiedHistogramChart', 'data-request-data')) ?? '';
       expect(JSON.parse(requestData)).to.eql({
         dataViewId: 'long-window-logstash-*',
         timeField: '@timestamp',

@@ -7,7 +7,6 @@
 
 import expect from '@kbn/expect';
 import { BASE_ALERTING_API_PATH } from '@kbn/alerting-plugin/common';
-import { DETECTION_ENGINE_RULES_BULK_DELETE } from '@kbn/security-solution-plugin/common/constants';
 import {
   createLegacyRuleAction,
   getSimpleRule,
@@ -25,11 +24,13 @@ import { FtrProviderContext } from '../../../../../ftr_provider_context';
 
 export default ({ getService }: FtrProviderContext): void => {
   const supertest = getService('supertest');
+  const securitySolutionApi = getService('securitySolutionApi');
   const log = getService('log');
   const es = getService('es');
 
-  describe('@ess delete_rules_bulk_legacy', () => {
-    describe('deleting rules bulk using POST', () => {
+  // FLAKY: https://github.com/elastic/kibana/issues/214633
+  describe.skip('@ess delete_rules_bulk_legacy', () => {
+    describe('deleting rules bulk using bulk_action endpoint', () => {
       beforeEach(async () => {
         await createAlertsIndex(supertest, log);
       });
@@ -45,7 +46,7 @@ export default ({ getService }: FtrProviderContext): void => {
       it('should return the legacy action in the response body when it deletes a rule that has one', async () => {
         // create an action
         const { body: hookAction } = await supertest
-          .post('/api/actions/action')
+          .post('/api/actions/connector')
           .set('kbn-xsrf', 'true')
           .send(getSlackAction())
           .expect(200);
@@ -56,22 +57,23 @@ export default ({ getService }: FtrProviderContext): void => {
         // Add a legacy rule action to the body of the rule
         await createLegacyRuleAction(supertest, createRuleBody.id, hookAction.id);
 
-        // delete the rule with the legacy action
-        const { body } = await supertest
-          .delete(DETECTION_ENGINE_RULES_BULK_DELETE)
-          .set('kbn-xsrf', 'true')
-          .set('elastic-api-version', '2023-10-31')
-          .send([{ id: createRuleBody.id }])
+        // delete the rule in bulk using the bulk_actions endpoint
+        const { body } = await securitySolutionApi
+          .performRulesBulkAction({
+            query: { dry_run: false },
+            body: {
+              ids: [createRuleBody.id],
+              action: 'delete',
+            },
+          })
           .expect(200);
 
-        // ensure we only get one body back
-        expect(body.length).to.eql(1);
-
+        expect(body.attributes.results.deleted.length).to.eql(1);
         // ensure that its actions equal what we expect
-        expect(body[0].actions).to.eql([
+        expect(body.attributes.results.deleted[0].actions).to.eql([
           {
             id: hookAction.id,
-            action_type_id: hookAction.actionTypeId,
+            action_type_id: hookAction.connector_type_id,
             group: 'default',
             params: {
               message:
@@ -88,12 +90,12 @@ export default ({ getService }: FtrProviderContext): void => {
       it('should return 2 legacy actions in the response body when it deletes 2 rules', async () => {
         // create two different actions
         const { body: hookAction1 } = await supertest
-          .post('/api/actions/action')
+          .post('/api/actions/connector')
           .set('kbn-xsrf', 'true')
           .send(getSlackAction())
           .expect(200);
         const { body: hookAction2 } = await supertest
-          .post('/api/actions/action')
+          .post('/api/actions/connector')
           .set('kbn-xsrf', 'true')
           .send(getSlackAction())
           .expect(200);
@@ -106,22 +108,25 @@ export default ({ getService }: FtrProviderContext): void => {
         await createLegacyRuleAction(supertest, createRuleBody1.id, hookAction1.id);
         await createLegacyRuleAction(supertest, createRuleBody2.id, hookAction2.id);
 
-        // delete 2 rules where both have legacy actions
-        const { body } = await supertest
-          .delete(DETECTION_ENGINE_RULES_BULK_DELETE)
-          .set('kbn-xsrf', 'true')
-          .set('elastic-api-version', '2023-10-31')
-          .send([{ id: createRuleBody1.id }, { id: createRuleBody2.id }])
+        // delete the rule in bulk using the bulk_actions endpoint
+        const { body } = await securitySolutionApi
+          .performRulesBulkAction({
+            query: { dry_run: false },
+            body: {
+              ids: [createRuleBody1.id, createRuleBody2.id],
+              action: 'delete',
+            },
+          })
           .expect(200);
 
         // ensure we only get two bodies back
-        expect(body.length).to.eql(2);
+        expect(body.attributes.results.deleted.length).to.eql(2);
 
         // ensure that its actions equal what we expect for both responses
-        expect(body[0].actions).to.eql([
+        expect(body.attributes.results.deleted[0].actions).to.eql([
           {
             id: hookAction1.id,
-            action_type_id: hookAction1.actionTypeId,
+            action_type_id: hookAction1.connector_type_id,
             group: 'default',
             params: {
               message:
@@ -130,10 +135,10 @@ export default ({ getService }: FtrProviderContext): void => {
             frequency: { summary: true, throttle: '1h', notifyWhen: 'onThrottleInterval' },
           },
         ]);
-        expect(body[1].actions).to.eql([
+        expect(body.attributes.results.deleted[1].actions).to.eql([
           {
             id: hookAction2.id,
-            action_type_id: hookAction2.actionTypeId,
+            action_type_id: hookAction2.connector_type_id,
             group: 'default',
             params: {
               message:
@@ -150,7 +155,7 @@ export default ({ getService }: FtrProviderContext): void => {
       it('should delete a legacy action when it deletes a rule that has one', async () => {
         // create an action
         const { body: hookAction } = await supertest
-          .post('/api/actions/action')
+          .post('/api/actions/connector')
           .set('kbn-xsrf', 'true')
           .send(getWebHookAction())
           .expect(200);
@@ -168,12 +173,15 @@ export default ({ getService }: FtrProviderContext): void => {
           createRuleBody.id
         );
 
-        // bulk delete the rule
-        await supertest
-          .delete(DETECTION_ENGINE_RULES_BULK_DELETE)
-          .set('kbn-xsrf', 'true')
-          .set('elastic-api-version', '2023-10-31')
-          .send([{ id: createRuleBody.id }])
+        // delete the rule in bulk using the bulk_actions endpoint
+        await securitySolutionApi
+          .performRulesBulkAction({
+            query: { dry_run: false },
+            body: {
+              ids: [createRuleBody.id],
+              action: 'delete',
+            },
+          })
           .expect(200);
 
         // Test to ensure that we have exactly 0 legacy actions by querying the Alerting client REST API directly

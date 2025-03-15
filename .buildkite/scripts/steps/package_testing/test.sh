@@ -5,8 +5,9 @@ set -euo pipefail
 source "$(dirname "$0")/../../common/util.sh"
 .buildkite/scripts/bootstrap.sh
 
-# temporary adding this to get screenshots
-is_test_execution_step
+# temporary enable this to get screenshots on package testing failures
+#
+#is_test_execution_step
 
 echo "--- Package Testing for $TEST_PACKAGE"
 
@@ -56,4 +57,4 @@ export TEST_ES_URL="http://elastic:changeme@192.168.56.1:9200"
 cd x-pack
 
 echo "--- FTR - Reporting"
-node scripts/functional_test_runner.js --config test/functional/apps/visualize/config.ts --include-tag=smoke --quiet
+node scripts/functional_test_runner.js --config src/platform/test/functional/apps/visualize/config.ts --include-tag=smoke --quiet
