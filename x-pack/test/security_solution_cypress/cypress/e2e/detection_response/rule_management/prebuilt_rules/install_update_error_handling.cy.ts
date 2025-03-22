@@ -5,6 +5,10 @@
  * 2.0.
  */
 
+import {
+  deleteAlertsAndRules,
+  deletePrebuiltRulesAssets,
+} from '../../../../tasks/api_calls/common';
 import { createRuleAssetSavedObject } from '../../../../helpers/rules';
 import {
   getInstallSingleRuleButtonByRuleId,
@@ -39,9 +43,11 @@ import { visitRulesManagementTable } from '../../../../tasks/rules_management';
 // https://github.com/elastic/kibana/issues/179970
 describe(
   'Detection rules, Prebuilt Rules Installation and Update - Error handling',
-  { tags: ['@ess', '@serverless', '@brokenInServerlessQA'] },
+  { tags: ['@ess', '@serverless', '@skipInServerlessMKI'] },
   () => {
     beforeEach(() => {
+      deletePrebuiltRulesAssets();
+      deleteAlertsAndRules();
       preventPrebuiltRulesPackageInstallation();
       login();
       visitRulesManagementTable();

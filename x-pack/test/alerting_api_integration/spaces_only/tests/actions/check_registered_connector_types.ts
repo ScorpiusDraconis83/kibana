@@ -31,6 +31,7 @@ export default function createRegisteredConnectorTypeTests({ getService }: FtrPr
           '.d3security',
           '.email',
           '.index',
+          '.inference',
           '.pagerduty',
           '.swimlane',
           '.server-log',
@@ -43,14 +44,20 @@ export default function createRegisteredConnectorTypeTests({ getService }: FtrPr
           '.servicenow-sir',
           '.servicenow-itom',
           '.jira',
+          '.observability-ai-assistant',
           '.resilient',
           '.teams',
+          '.thehive',
           '.tines',
           '.torq',
           '.opsgenie',
           '.gen-ai',
           '.bedrock',
+          '.gemini',
           '.sentinelone',
+          '.cases',
+          '.crowdstrike',
+          '.microsoft_defender_endpoint',
         ].sort()
       );
     });

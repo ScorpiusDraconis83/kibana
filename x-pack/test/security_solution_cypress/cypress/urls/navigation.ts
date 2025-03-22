@@ -15,14 +15,13 @@ export const DASHBOARDS_URL = '/app/security/dashboards';
 
 export const ASSETS_URL = '/app/security/assets';
 export const ENDPOINTS_URL = '/app/security/administration/endpoints';
-export const CLOUD_DEFEND_URL = '/app/security/cloud_defend';
 export const POLICIES_URL = '/app/security/administration/policy';
 export const TRUSTED_APPS_URL = '/app/security/administration/trusted_apps';
 export const EVENT_FILTERS_URL = '/app/security/administration/event_filters';
 export const BLOCKLIST_URL = '/app/security/administration/blocklist';
 export const CSP_BENCHMARKS_URL = '/app/security/cloud_security_posture/benchmarks';
 export const CSP_DASHBOARD_URL = '/app/security/cloud_security_posture/dashboard';
-export const CSP_FINDINGS_URL = '/app/security/cloud_security_posture/findings/vulnerabilities';
+export const CSP_FINDINGS_URL = '/app/security/cloud_security_posture/findings/configurations';
 
 export const RULES_LANDING_URL = '/app/security/rules/landing';
 export const RULES_COVERAGE_URL = '/app/security/rules_coverage_overview';
@@ -69,6 +68,8 @@ export const ALERTS_URL = '/app/security/alerts';
 export const EXCEPTIONS_URL = '/app/security/exceptions';
 export const CREATE_RULE_URL = '/app/security/rules/create';
 export const ENTITY_ANALYTICS_MANAGEMENT_URL = '/app/security/entity_analytics_management';
+export const ENTITY_ANALYTICS_ASSET_CRITICALITY_URL =
+  '/app/security/entity_analytics_asset_criticality';
 
 export const exceptionsListDetailsUrl = (listId: string) =>
   `/app/security/exceptions/details/${listId}`;
@@ -77,3 +78,9 @@ export const exceptionsListDetailsUrl = (listId: string) =>
 export const DISCOVER_URL = '/app/discover';
 export const OSQUERY_URL = '/app/osquery';
 export const FLEET_URL = '/app/fleet';
+
+// Entity Analytics
+export const ENTITY_ANALYTICS_DASHBOARD_URL = '/app/security/entity_analytics';
+
+// Asset Inventory
+export const ASSET_INVENTORY_URL = '/app/security/asset_inventory';

@@ -1,37 +1,36 @@
 /*
  * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
- * or more contributor license agreements. Licensed under the Elastic License
- * 2.0 and the Server Side Public License, v 1; you may not use this file except
- * in compliance with, at your election, the Elastic License 2.0 or the Server
- * Side Public License, v 1.
+ * or more contributor license agreements. Licensed under the "Elastic License
+ * 2.0", the "GNU Affero General Public License v3.0 only", and the "Server Side
+ * Public License v 1"; you may not use this file except in compliance with, at
+ * your election, the "Elastic License 2.0", the "GNU Affero General Public
+ * License v3.0 only", or the "Server Side Public License, v 1".
  */
 
-import { EuiFlexGroup, EuiFlexItem } from '@elastic/eui';
+import { EuiFlexGroup, EuiFlexItem, useEuiTheme } from '@elastic/eui';
 import { css } from '@emotion/react';
-import { ChartsPluginStart } from '@kbn/charts-plugin/public';
-import { Reference } from '@kbn/content-management-utils';
+import type { Reference } from '@kbn/content-management-utils';
 import { CoreStart } from '@kbn/core-lifecycle-browser';
-import { DataPublicPluginStart } from '@kbn/data-plugin/public';
 import { DataView } from '@kbn/data-views-plugin/common';
-import {
-  DataViewsPublicPluginStart,
-  DATA_VIEW_SAVED_OBJECT_TYPE,
-} from '@kbn/data-views-plugin/public';
+import { DATA_VIEW_SAVED_OBJECT_TYPE } from '@kbn/data-views-plugin/public';
 import { ReactEmbeddableFactory } from '@kbn/embeddable-plugin/public';
-import { FieldFormatsStart } from '@kbn/field-formats-plugin/public';
 import { i18n } from '@kbn/i18n';
-import { initializeTitles, useBatchedPublishingSubjects } from '@kbn/presentation-publishing';
+import { initializeTitleManager, useBatchedPublishingSubjects } from '@kbn/presentation-publishing';
 import { LazyDataViewPicker, withSuspense } from '@kbn/presentation-util-plugin/public';
-import { euiThemeVars } from '@kbn/ui-theme';
 import {
   UnifiedFieldListSidebarContainer,
   type UnifiedFieldListSidebarContainerProps,
 } from '@kbn/unified-field-list';
 import { cloneDeep } from 'lodash';
-import React, { useEffect, useState } from 'react';
-import { BehaviorSubject, Subscription } from 'rxjs';
+import React, { useEffect } from 'react';
+import { BehaviorSubject, skip, Subscription, switchMap } from 'rxjs';
 import { FIELD_LIST_DATA_VIEW_REF_NAME, FIELD_LIST_ID } from './constants';
-import { FieldListApi, FieldListSerializedStateState } from './types';
+import {
+  FieldListApi,
+  Services,
+  FieldListSerializedStateState,
+  FieldListRuntimeState,
+} from './types';
 
 const DataViewPicker = withSuspense(LazyDataViewPicker, null);
 
@@ -48,25 +47,16 @@ const getCreationOptions: UnifiedFieldListSidebarContainerProps['getCreationOpti
 
 export const getFieldListFactory = (
   core: CoreStart,
-  {
-    dataViews,
-    data,
-    charts,
-    fieldFormats,
-  }: {
-    dataViews: DataViewsPublicPluginStart;
-    data: DataPublicPluginStart;
-    charts: ChartsPluginStart;
-    fieldFormats: FieldFormatsStart;
-  }
+  { dataViews, data, charts, fieldFormats }: Services
 ) => {
   const fieldListEmbeddableFactory: ReactEmbeddableFactory<
     FieldListSerializedStateState,
+    FieldListRuntimeState,
     FieldListApi
   > = {
     type: FIELD_LIST_ID,
     deserializeState: (state) => {
-      const serializedState = cloneDeep(state.rawState) as FieldListSerializedStateState;
+      const serializedState = cloneDeep(state.rawState);
       // inject the reference
       const dataViewIdRef = state.references?.find(
         (ref) => ref.name === FIELD_LIST_DATA_VIEW_REF_NAME
@@ -79,31 +69,45 @@ export const getFieldListFactory = (
     },
     buildEmbeddable: async (initialState, buildApi) => {
       const subscriptions = new Subscription();
-      const { titlesApi, titleComparators, serializeTitles } = initializeTitles(initialState);
+      const titleManager = initializeTitleManager(initialState);
 
-      const allDataViews = await dataViews.getIdsWithTitle();
-      const selectedDataViewId$ = new BehaviorSubject<string | undefined>(
-        initialState.dataViewId ?? (await dataViews.getDefaultDataView())?.id
-      );
-
-      // transform data view ID into data views array.
-      const getDataViews = async (id?: string) => {
-        return id ? [await dataViews.get(id)] : undefined;
-      };
-      const dataViews$ = new BehaviorSubject<DataView[] | undefined>(
-        await getDataViews(initialState.dataViewId)
-      );
-      subscriptions.add(
-        selectedDataViewId$.subscribe(async (id) => dataViews$.next(await getDataViews(id)))
-      );
-
+      // set up data views
+      const [allDataViews, defaultDataViewId] = await Promise.all([
+        dataViews.getIdsWithTitle(),
+        dataViews.getDefaultId(),
+      ]);
+      if (!defaultDataViewId || allDataViews.length === 0) {
+        throw new Error(
+          i18n.translate('embeddableExamples.unifiedFieldList.noDefaultDataViewErrorMessage', {
+            defaultMessage: 'The field list must be used with at least one Data View present',
+          })
+        );
+      }
+      const initialDataViewId = initialState.dataViewId ?? defaultDataViewId;
+      const initialDataView = await dataViews.get(initialDataViewId);
+      const selectedDataViewId$ = new BehaviorSubject<string | undefined>(initialDataViewId);
+      const dataViews$ = new BehaviorSubject<DataView[] | undefined>([initialDataView]);
       const selectedFieldNames$ = new BehaviorSubject<string[] | undefined>(
         initialState.selectedFieldNames
       );
 
+      subscriptions.add(
+        selectedDataViewId$
+          .pipe(
+            skip(1),
+            switchMap((dataViewId) => dataViews.get(dataViewId ?? defaultDataViewId))
+          )
+          .subscribe((nextSelectedDataView) => {
+            dataViews$.next([nextSelectedDataView]);
+            selectedFieldNames$.next([]);
+          })
+      );
+
       const api = buildApi(
         {
-          ...titlesApi,
+          ...titleManager.api,
+          dataViews$,
+          selectedFields: selectedFieldNames$,
           serializeState: () => {
             const dataViewId = selectedDataViewId$.getValue();
             const references: Reference[] = dataViewId
@@ -117,7 +121,7 @@ export const getFieldListFactory = (
               : [];
             return {
               rawState: {
-                ...serializeTitles(),
+                ...titleManager.serialize(),
                 // here we skip serializing the dataViewId, because the reference contains that information.
                 selectedFieldNames: selectedFieldNames$.getValue(),
               },
@@ -126,7 +130,7 @@ export const getFieldListFactory = (
           },
         },
         {
-          ...titleComparators,
+          ...titleManager.comparators,
           dataViewId: [selectedDataViewId$, (value) => selectedDataViewId$.next(value)],
           selectedFieldNames: [
             selectedFieldNames$,
@@ -141,25 +145,13 @@ export const getFieldListFactory = (
       return {
         api,
         Component: () => {
-          const [selectedDataViewId, selectedFieldNames] = useBatchedPublishingSubjects(
-            selectedDataViewId$,
+          const [renderDataViews, selectedFieldNames] = useBatchedPublishingSubjects(
+            dataViews$,
             selectedFieldNames$
           );
+          const { euiTheme } = useEuiTheme();
 
-          const [selectedDataView, setSelectedDataView] = useState<DataView | undefined>(undefined);
-
-          useEffect(() => {
-            if (!selectedDataViewId) return;
-            let mounted = true;
-            (async () => {
-              const dataView = await dataViews.get(selectedDataViewId);
-              if (!mounted) return;
-              setSelectedDataView(dataView);
-            })();
-            return () => {
-              mounted = false;
-            };
-          }, [selectedDataViewId]);
+          const selectedDataView = renderDataViews?.[0];
 
           // On destroy
           useEffect(() => {
@@ -173,12 +165,12 @@ export const getFieldListFactory = (
               <EuiFlexItem
                 grow={false}
                 css={css`
-                  padding: ${euiThemeVars.euiSizeS};
+                  padding: ${euiTheme.size.s};
                 `}
               >
                 <DataViewPicker
                   dataViews={allDataViews}
-                  selectedDataViewId={selectedDataViewId}
+                  selectedDataViewId={selectedDataView?.id}
                   onChangeDataViewId={(nextSelection) => {
                     selectedDataViewId$.next(nextSelection);
                   }}

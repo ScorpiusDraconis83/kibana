@@ -19,9 +19,8 @@ import {
   getPrebuiltRulesStatus,
   installPrebuiltRules,
   installPrebuiltRulesPackageByVersion,
-  upgradePrebuiltRules,
+  performUpgradePrebuiltRules,
   reviewPrebuiltRulesToInstall,
-  reviewPrebuiltRulesToUpgrade,
 } from '../../../../utils';
 import { deleteAllRules } from '../../../../../../../common/utils/security_solution';
 
@@ -62,7 +61,7 @@ export default ({ getService }: FtrProviderContext): void => {
     return getPackageResponse.body.item.version ?? '';
   };
 
-  describe('@ess @serverless @skipInQA update_prebuilt_rules_package', () => {
+  describe('@ess @serverless @skipInServerlessMKI update_prebuilt_rules_package', () => {
     before(async () => {
       const configFilePath = path.resolve(REPO_ROOT, 'fleet_packages.json');
       const fleetPackages = await fs.readFile(configFilePath, 'utf8');
@@ -220,25 +219,16 @@ export default ({ getService }: FtrProviderContext): void => {
         )
       );
 
-      // Verify that the upgrade _review endpoint returns the same number of rules to upgrade as the status endpoint
-      const prebuiltRulesToUpgradeReviewAfterLatestPackageInstallation =
-        await reviewPrebuiltRulesToUpgrade(supertest);
-      expect(
-        prebuiltRulesToUpgradeReviewAfterLatestPackageInstallation.stats.num_rules_to_upgrade_total
-      ).toBe(statusAfterLatestPackageInstallation.stats.num_prebuilt_rules_to_upgrade);
-
-      // Call the upgrade _perform endpoint and verify that the number of upgraded rules is the same as the one
-      // returned by the _review endpoint and the status endpoint
-      const upgradePrebuiltRulesResponseAfterLatestPackageInstallation = await upgradePrebuiltRules(
-        es,
-        supertest
-      );
+      // Call the upgrade _perform endpoint to upgrade all rules to their target version and verify that the number
+      // of upgraded rules is the same as the one returned by the _review endpoint and the status endpoint
+      const upgradePrebuiltRulesResponseAfterLatestPackageInstallation =
+        await performUpgradePrebuiltRules(es, supertest, {
+          mode: 'ALL_RULES',
+          pick_version: 'TARGET',
+        });
 
       expect(upgradePrebuiltRulesResponseAfterLatestPackageInstallation.summary.succeeded).toEqual(
         statusAfterLatestPackageInstallation.stats.num_prebuilt_rules_to_upgrade
-      );
-      expect(upgradePrebuiltRulesResponseAfterLatestPackageInstallation.summary.succeeded).toEqual(
-        prebuiltRulesToUpgradeReviewAfterLatestPackageInstallation.stats.num_rules_to_upgrade_total
       );
 
       // Get installed rules

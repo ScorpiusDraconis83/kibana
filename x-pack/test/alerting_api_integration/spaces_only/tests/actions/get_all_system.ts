@@ -11,7 +11,7 @@ import { getUrlPrefix, ObjectRemover } from '../../../common/lib';
 import { FtrProviderContext } from '../../../common/ftr_provider_context';
 
 // eslint-disable-next-line import/no-default-export
-export default function getAllActionTests({ getService }: FtrProviderContext) {
+export default function getAllConnectorsTests({ getService }: FtrProviderContext) {
   const supertest = getService('supertest');
 
   describe('getAllSystem', () => {
@@ -19,13 +19,13 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
 
     afterEach(() => objectRemover.removeAll());
 
-    it('should handle get all action request appropriately', async () => {
-      const { body: createdAction } = await supertest
-        .post(`${getUrlPrefix(Spaces.space1.id)}/api/actions/action`)
+    it('should handle get all connector request appropriately', async () => {
+      const { body: createdConnector } = await supertest
+        .post(`${getUrlPrefix(Spaces.space1.id)}/api/actions/connector`)
         .set('kbn-xsrf', 'foo')
         .send({
-          name: 'My action',
-          actionTypeId: 'test.index-record',
+          name: 'My connector',
+          connector_type_id: 'test.index-record',
           config: {
             unencrypted: `This value shouldn't get encrypted`,
           },
@@ -34,7 +34,7 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
           },
         })
         .expect(200);
-      objectRemover.add(Spaces.space1.id, createdAction.id, 'action', 'actions');
+      objectRemover.add(Spaces.space1.id, createdConnector.id, 'connector', 'actions');
 
       const { body: connectors } = await supertest
         .get(`${getUrlPrefix(Spaces.space1.id)}/internal/actions/connectors`)
@@ -57,10 +57,19 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
           referenced_by_count: 0,
         },
         {
-          id: createdAction.id,
+          connector_type_id: '.cases',
+          id: 'system-connector-.cases',
+          is_deprecated: false,
+          is_preconfigured: false,
+          is_system_action: true,
+          name: 'Cases',
+          referenced_by_count: 0,
+        },
+        {
+          id: createdConnector.id,
           is_preconfigured: false,
           is_deprecated: false,
-          name: 'My action',
+          name: 'My connector',
           connector_type_id: 'test.index-record',
           is_missing_secrets: false,
           is_system_action: false,
@@ -77,6 +86,15 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
           is_system_action: false,
           name: 'Notification Email Connector',
           referenced_by_count: 0,
+        },
+        {
+          id: 'system-connector-.observability-ai-assistant',
+          name: 'Observability AI Assistant',
+          connector_type_id: '.observability-ai-assistant',
+          is_preconfigured: false,
+          is_deprecated: false,
+          referenced_by_count: 0,
+          is_system_action: true,
         },
         {
           id: 'preconfigured-es-index-action',
@@ -115,33 +133,6 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
           referenced_by_count: 0,
         },
         {
-          connector_type_id: 'test.system-action',
-          id: 'system-connector-test.system-action',
-          is_deprecated: false,
-          is_preconfigured: false,
-          is_system_action: true,
-          name: 'System action: test.system-action',
-          referenced_by_count: 0,
-        },
-        {
-          connector_type_id: 'test.system-action-connector-adapter',
-          id: 'system-connector-test.system-action-connector-adapter',
-          is_deprecated: false,
-          is_preconfigured: false,
-          is_system_action: true,
-          name: 'System action: test.system-action-connector-adapter',
-          referenced_by_count: 0,
-        },
-        {
-          connector_type_id: 'test.system-action-kibana-privileges',
-          id: 'system-connector-test.system-action-kibana-privileges',
-          is_deprecated: false,
-          is_preconfigured: false,
-          is_system_action: true,
-          name: 'System action: test.system-action-kibana-privileges',
-          referenced_by_count: 0,
-        },
-        {
           id: 'custom-system-abc-connector',
           is_preconfigured: true,
           is_deprecated: false,
@@ -150,6 +141,34 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
           name: 'SystemABC',
           referenced_by_count: 0,
         },
+        {
+          connector_type_id: 'test.system-action',
+          id: 'system-connector-test.system-action',
+          is_deprecated: false,
+          is_preconfigured: false,
+          is_system_action: true,
+          name: 'Test system action',
+          referenced_by_count: 0,
+        },
+        {
+          connector_type_id: 'test.system-action-connector-adapter',
+          id: 'system-connector-test.system-action-connector-adapter',
+          is_deprecated: false,
+          is_preconfigured: false,
+          is_system_action: true,
+          name: 'Test system action with a connector adapter set',
+          referenced_by_count: 0,
+        },
+        {
+          connector_type_id: 'test.system-action-kibana-privileges',
+          id: 'system-connector-test.system-action-kibana-privileges',
+          is_deprecated: false,
+          is_preconfigured: false,
+          is_system_action: true,
+          name: 'Test system action with kibana privileges',
+          referenced_by_count: 0,
+        },
+
         {
           id: 'preconfigured.test.index-record',
           is_preconfigured: true,
@@ -171,13 +190,13 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
       ]);
     });
 
-    it(`shouldn't get all action from another space`, async () => {
-      const { body: createdAction } = await supertest
-        .post(`${getUrlPrefix(Spaces.space1.id)}/api/actions/action`)
+    it(`shouldn't get all connectors from another space`, async () => {
+      const { body: createdConnector } = await supertest
+        .post(`${getUrlPrefix(Spaces.space1.id)}/api/actions/connector`)
         .set('kbn-xsrf', 'foo')
         .send({
-          name: 'My action',
-          actionTypeId: 'test.index-record',
+          name: 'My connector',
+          connector_type_id: 'test.index-record',
           config: {
             unencrypted: `This value shouldn't get encrypted`,
           },
@@ -186,7 +205,7 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
           },
         })
         .expect(200);
-      objectRemover.add(Spaces.space1.id, createdAction.id, 'action', 'actions');
+      objectRemover.add(Spaces.space1.id, createdConnector.id, 'connector', 'actions');
 
       const { body: connectors } = await supertest
         .get(`${getUrlPrefix(Spaces.other.id)}/internal/actions/connectors`)
@@ -209,12 +228,30 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
           referenced_by_count: 0,
         },
         {
+          connector_type_id: '.cases',
+          id: 'system-connector-.cases',
+          is_deprecated: false,
+          is_preconfigured: false,
+          is_system_action: true,
+          name: 'Cases',
+          referenced_by_count: 0,
+        },
+        {
           connector_type_id: '.email',
           id: 'notification-email',
           is_deprecated: false,
           is_preconfigured: true,
           is_system_action: false,
           name: 'Notification Email Connector',
+          referenced_by_count: 0,
+        },
+        {
+          connector_type_id: '.observability-ai-assistant',
+          name: 'Observability AI Assistant',
+          is_deprecated: false,
+          is_preconfigured: false,
+          is_system_action: true,
+          id: 'system-connector-.observability-ai-assistant',
           referenced_by_count: 0,
         },
         {
@@ -254,12 +291,21 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
           referenced_by_count: 0,
         },
         {
+          id: 'custom-system-abc-connector',
+          is_preconfigured: true,
+          is_deprecated: false,
+          is_system_action: false,
+          connector_type_id: 'system-abc-action-type',
+          name: 'SystemABC',
+          referenced_by_count: 0,
+        },
+        {
           connector_type_id: 'test.system-action',
           id: 'system-connector-test.system-action',
           is_deprecated: false,
           is_preconfigured: false,
           is_system_action: true,
-          name: 'System action: test.system-action',
+          name: 'Test system action',
           referenced_by_count: 0,
         },
         {
@@ -268,7 +314,7 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
           is_deprecated: false,
           is_preconfigured: false,
           is_system_action: true,
-          name: 'System action: test.system-action-connector-adapter',
+          name: 'Test system action with a connector adapter set',
           referenced_by_count: 0,
         },
         {
@@ -277,16 +323,7 @@ export default function getAllActionTests({ getService }: FtrProviderContext) {
           is_deprecated: false,
           is_preconfigured: false,
           is_system_action: true,
-          name: 'System action: test.system-action-kibana-privileges',
-          referenced_by_count: 0,
-        },
-        {
-          id: 'custom-system-abc-connector',
-          is_preconfigured: true,
-          is_deprecated: false,
-          is_system_action: false,
-          connector_type_id: 'system-abc-action-type',
-          name: 'SystemABC',
+          name: 'Test system action with kibana privileges',
           referenced_by_count: 0,
         },
         {

@@ -7,7 +7,7 @@
 
 import expect from '@kbn/expect';
 import type SuperTest from 'supertest';
-import type * as estypes from '@elastic/elasticsearch/lib/api/typesWithBodyKey';
+import type { estypes } from '@elastic/elasticsearch';
 import { ToolingLog } from '@kbn/tooling-log';
 import { DETECTION_ENGINE_QUERY_SIGNALS_URL } from '@kbn/security-solution-plugin/common/constants';
 import { DetectionAlert } from '@kbn/security-solution-plugin/common/api/detection_engine';
@@ -30,7 +30,7 @@ import { createComment, deleteAllComments } from './api';
 import { postCaseReq } from './mock';
 
 export const createSecuritySolutionAlerts = async (
-  supertest: SuperTest.SuperTest<SuperTest.Test>,
+  supertest: SuperTest.Agent,
   log: ToolingLog,
   numberOfSignals: number = 1
 ): Promise<estypes.SearchResponse<DetectionAlert & RiskEnrichmentFields>> => {
@@ -47,7 +47,7 @@ export const createSecuritySolutionAlerts = async (
 };
 
 export const getSecuritySolutionAlerts = async (
-  supertest: SuperTest.SuperTest<SuperTest.Test>,
+  supertest: SuperTest.Agent,
   alertIds: string[]
 ): Promise<estypes.SearchResponse<DetectionAlert & RiskEnrichmentFields>> => {
   const { body: updatedAlert } = await supertest
@@ -70,7 +70,7 @@ export const getAlertById = async ({
   expectedHttpCode = 200,
   auth = { user: superUser, space: null },
 }: {
-  supertest: SuperTest.SuperTest<SuperTest.Test>;
+  supertest: SuperTest.Agent;
   id: string;
   index: string;
   expectedHttpCode?: number;
@@ -97,7 +97,7 @@ export const createCaseAttachAlertAndDeleteAlert = async ({
   alerts,
   getAlerts,
 }: {
-  supertest: SuperTest.SuperTest<SuperTest.Test>;
+  supertest: SuperTest.Agent;
   totalCases: number;
   indexOfCaseToDelete: number;
   owner: string;
@@ -145,7 +145,7 @@ export const createCaseAttachAlertAndDeleteCase = async ({
   alerts,
   getAlerts,
 }: {
-  supertest: SuperTest.SuperTest<SuperTest.Test>;
+  supertest: SuperTest.Agent;
   totalCases: number;
   indicesOfCaseToDelete: number[];
   owner: string;
@@ -194,7 +194,7 @@ export const createCaseAndAttachAlert = async ({
   alerts,
   getAlerts,
 }: {
-  supertest: SuperTest.SuperTest<SuperTest.Test>;
+  supertest: SuperTest.Agent;
   totalCases: number;
   owner: string;
   alerts: Alerts;
